@@ -1,0 +1,34 @@
+# Unity generated folders
+Library/
+Temp/
+Obj/
+Build/
+Logs/
+UserSettings/
+MemoryCaptures/
+
+# VS and JetBrains Rider folders
+.vs/
+.idea/
+
+# Unity generated files
+*.csproj
+*.sln
+*.user
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+
+# OS or editor swap files and temp
+.DS_Store
+*.swp
+*.tmp
+*.bak
+*.old
+
+# Do NOT ignore these project files
+!Assets/
+!Packages/
+!ProjectSettings/
