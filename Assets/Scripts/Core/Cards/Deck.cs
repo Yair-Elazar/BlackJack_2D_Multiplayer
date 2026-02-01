@@ -59,6 +59,17 @@ public class Deck
         return topCard;
     }
 
+    public List<Card> DrawMultiple(int n)
+{
+    List<Card> drawn = new List<Card>();
+    for (int i = 0; i < n && cards.Count > 0; i++)
+    {
+        drawn.Add(DrawCard());
+    }
+    return drawn;
+}
+
+
     /// <summary>
     /// Returns a string representation for debugging (e.g., number of cards left).
     /// </summary>

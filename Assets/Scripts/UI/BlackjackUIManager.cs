@@ -14,6 +14,8 @@ public class BlackjackUIManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI resultText;
     [SerializeField] private Button hitButton;
     [SerializeField] private Button standButton;
+    [SerializeField] private Button newRoundButton;
+
 
     private BlackjackGameManager gameManager;
     private const string defaultPlayerName = "Player";
@@ -26,6 +28,8 @@ public class BlackjackUIManager : MonoBehaviour
 
         hitButton.onClick.AddListener(OnHit);
         standButton.onClick.AddListener(OnStand);
+        newRoundButton.onClick.AddListener(StartNewRound);
+
     }
 
     /// <summary>

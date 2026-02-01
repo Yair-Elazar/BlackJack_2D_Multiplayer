@@ -10,7 +10,8 @@ public class Hand
     private readonly List<Card> cards = new List<Card>();
 
     /// <summary>
-    /// Adds a card to the hand.
+
+// Adds a card to the hand.
     /// </summary>
     /// <param name="card">The Card to add.</param>
     public void AddCard(Card card)
@@ -64,6 +65,11 @@ public class Hand
         }
         sb.Append($" (Total: {GetTotalValue()})");
         return sb.ToString();
+    }
+
+    public void ResetHand()
+    {
+    cards.Clear();
     }
 
     /// <summary>
