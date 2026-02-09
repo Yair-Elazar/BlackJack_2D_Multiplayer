@@ -4,11 +4,14 @@ using UnityEngine.UI;
 
 /// <summary>
 /// Manages Blackjack game UI and connects UI elements to game logic.
-/// Uses the pure C# BlackjackGameManager as a backend engine.
+/// Fully compatible with the new BlackjackGameManager using GameState and RoundResult.
 /// </summary>
 public class BlackjackUIManager : MonoBehaviour
 {
     [Header("UI References")]
+    [SerializeField] private Transform playerHandContainer;
+    [SerializeField] private Transform dealerHandContainer;
+    [SerializeField] private GameObject cardViewPrefab;
     [SerializeField] private TextMeshProUGUI playerText;
     [SerializeField] private TextMeshProUGUI dealerText;
     [SerializeField] private TextMeshProUGUI resultText;
@@ -16,70 +19,105 @@ public class BlackjackUIManager : MonoBehaviour
     [SerializeField] private Button standButton;
     [SerializeField] private Button newRoundButton;
 
-
     private BlackjackGameManager gameManager;
     private const string defaultPlayerName = "Player";
 
     private void Start()
     {
         gameManager = new BlackjackGameManager();
-        gameManager.StartNewRound(defaultPlayerName);
-        UpdateUI();
+        StartNewRound();
 
+        // Add button listeners
         hitButton.onClick.AddListener(OnHit);
         standButton.onClick.AddListener(OnStand);
         newRoundButton.onClick.AddListener(StartNewRound);
-
     }
 
-    /// <summary>
-    /// Handler for Hit button: draws card, updates UI, checks for bust.
-    /// </summary>
-    public void OnHit()
+    private void OnHit()
     {
-        if (gameManager.PlayerHit())
+        bool busted = gameManager.PlayerHit();
+        UpdateUI();
+
+        // אם השחקן בסט, סיים את הסיבוב והראה תוצאה
+        if (busted || gameManager.CurrentState == BlackjackGameManager.GameState.Finished)
         {
-            resultText.text = "Busted! Dealer Wins!";
+            UpdateResultText();
             hitButton.interactable = false;
             standButton.interactable = false;
         }
-        UpdateUI();
     }
 
-    /// <summary>
-    /// Handler for Stand button: ends player turn, lets dealer play, checks outcome.
-    /// </summary>
-    public void OnStand()
+    private void OnStand()
     {
         gameManager.PlayerStand();
-        string outcome = gameManager.CheckOutcome();
-        resultText.text = outcome;
+        UpdateUI();
+        UpdateResultText();
         hitButton.interactable = false;
         standButton.interactable = false;
-        UpdateUI();
     }
 
-    /// <summary>
-    /// Updates the UI elements to reflect the current game state.
-    /// </summary>
     private void UpdateUI()
     {
-        var playerHand = gameManager.Player.Hand;
-        var dealerHand = gameManager.Dealer.Hand;
-
-        playerText.text = $"Player: {playerHand.ToString()}";
-        dealerText.text = $"Dealer: {dealerHand.ToString()}";
+        RenderHand(gameManager.Player.Hand, playerHandContainer);
+        RenderHand(gameManager.Dealer.Hand, dealerHandContainer);
+        playerText.text = $"Player: {gameManager.Player.Hand.ToString()}";
+        dealerText.text = $"Dealer: {gameManager.Dealer.Hand.ToString()}";
     }
 
-    /// <summary>
-    /// Optional method to start a new round (can be connected to a UI button).
-    /// </summary>
+    private void UpdateResultText()
+    {
+        var result = gameManager.GetRoundResult();
+        if (!result.HasValue)
+        {
+            resultText.text = string.Empty;
+            return;
+        }
+
+        resultText.text = result.Value switch
+        {
+            BlackjackGameManager.RoundResult.PlayerWins => "Player Wins!",
+            BlackjackGameManager.RoundResult.DealerWins => "Dealer Wins!",
+            BlackjackGameManager.RoundResult.Push => "Push!",
+            BlackjackGameManager.RoundResult.PlayerBlackjack => "Blackjack! Player Wins!",
+            BlackjackGameManager.RoundResult.DealerBlackjack => "Blackjack! Dealer Wins!",
+            _ => string.Empty
+        };
+    }
+
     public void StartNewRound()
     {
-        gameManager.StartNewRound(defaultPlayerName);
-        hitButton.interactable = true;
-        standButton.interactable = true;
-        resultText.text = string.Empty;
-        UpdateUI();
+    gameManager.StartNewRound(defaultPlayerName);
+
+    ClearHandUI(playerHandContainer);
+    ClearHandUI(dealerHandContainer);
+
+    hitButton.interactable = true;
+    standButton.interactable = true;
+    resultText.text = string.Empty;
+
+    UpdateUI();
     }
+
+
+    private void ClearHandUI(Transform container)
+    {
+    foreach (Transform child in container)
+    {
+        Destroy(child.gameObject);
+    }
+    }
+
+    private void RenderHand(Hand hand, Transform container)
+    {
+    ClearHandUI(container);
+
+    foreach (var card in hand.Cards)
+    {
+        GameObject cardGO = Instantiate(cardViewPrefab, container);
+        CardView view = cardGO.GetComponent<CardView>();
+        view.SetCard(card);
+    }
+    }
+
+
 }

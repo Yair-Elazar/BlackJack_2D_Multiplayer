@@ -1,29 +1,44 @@
 /// <summary>
 /// Manages Blackjack game flow for single-player gameplay.
-/// Pure C# implementation using clean architecture principles.
+/// Pure C# implementation with proper state tracking and Blackjack rule handling.
 /// Prepared for future multiplayer expansion.
 /// </summary>
 public class BlackjackGameManager
 {
+    // Game state enums
+    public enum GameState { PlayerTurn, DealerTurn, Finished }
+    public enum RoundResult { PlayerWins, DealerWins, Push, PlayerBlackjack, DealerBlackjack }
+
     private Deck deck;
     private Player player;
     private Dealer dealer;
-    private bool isPlayerTurn;
+
+    private GameState gameState;
+    private RoundResult? roundResult; // null if round not finished yet
 
     /// <summary>
-    /// Gets the current player.
+    /// The current player.
     /// </summary>
     public Player Player => player;
 
     /// <summary>
-    /// Gets the current dealer.
+    /// The current dealer.
     /// </summary>
     public Dealer Dealer => dealer;
 
     /// <summary>
-    /// Starts a new round: resets deck, hands, and deals initial cards.
+    /// Current game state.
     /// </summary>
-    /// <param name="playerName">Name for the player (created if not exists).</param>
+    public GameState CurrentState => gameState;
+
+    /// <summary>
+    /// Round result, if the round has finished.
+    /// </summary>
+    public RoundResult? GetRoundResult() => roundResult;
+
+    /// <summary>
+    /// Starts a new round: resets deck, hands, deals cards, and handles immediate Blackjack.
+    /// </summary>
     public void StartNewRound(string playerName)
     {
         deck = new Deck();
@@ -39,65 +54,85 @@ public class BlackjackGameManager
         else
             dealer.ResetHand();
 
-        isPlayerTurn = true;
+        gameState = GameState.PlayerTurn;
+        roundResult = null;
 
-        // Deal two cards to player and dealer each
+        // Deal two cards to player and dealer
         for (int i = 0; i < 2; i++)
         {
             player.Hit(deck);
             dealer.Hand.AddCard(deck.DrawCard());
         }
+
+        // Check for immediate Blackjack
+        bool playerBJ = IsBlackjack(player.Hand);
+        bool dealerBJ = IsBlackjack(dealer.Hand);
+
+        if (playerBJ || dealerBJ)
+        {
+            gameState = GameState.Finished;
+
+            if (playerBJ && dealerBJ)
+                roundResult = RoundResult.Push;
+            else if (playerBJ)
+                roundResult = RoundResult.PlayerBlackjack;
+            else
+                roundResult = RoundResult.DealerBlackjack;
+        }
     }
 
     /// <summary>
-    /// Player chooses to take a card (Hit).
-    /// Returns true if the player busts as a result.
+    /// Player takes a card. Returns true if player busts.
     /// </summary>
     public bool PlayerHit()
     {
-        if (!isPlayerTurn)
+        if (gameState != GameState.PlayerTurn)
             return player.IsBusted;
 
         player.Hit(deck);
+
         if (player.IsBusted)
-            isPlayerTurn = false;
-        return player.IsBusted;
+        {
+            gameState = GameState.Finished;
+            roundResult = RoundResult.DealerWins;
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>
-    /// Player stands; dealer plays turn.
+    /// Player stands. Dealer plays and round outcome is determined.
     /// </summary>
     public void PlayerStand()
     {
-        if (!isPlayerTurn)
+        if (gameState != GameState.PlayerTurn)
             return;
 
-        isPlayerTurn = false;
+        gameState = GameState.DealerTurn;
         dealer.PlayTurn(deck);
+
+        int playerValue = player.Hand.GetTotalValue();
+        int dealerValue = dealer.Hand.GetTotalValue();
+        bool dealerBusted = dealer.Hand.IsBust();
+
+        gameState = GameState.Finished;
+
+        if (dealerBusted)
+            roundResult = RoundResult.PlayerWins;
+        else if (dealerValue > playerValue)
+            roundResult = RoundResult.DealerWins;
+        else if (dealerValue < playerValue)
+            roundResult = RoundResult.PlayerWins;
+        else
+            roundResult = RoundResult.Push;
     }
 
     /// <summary>
-    /// Checks the outcome of the current round.
-    /// Returns "Player Wins", "Dealer Wins", or "Push" (tie) based on Blackjack rules.
+    /// Checks if a hand is a Blackjack (21 with exactly 2 cards).
     /// </summary>
-    public string CheckOutcome()
+    private static bool IsBlackjack(Hand hand)
     {
-        int playerValue = player.Hand.GetTotalValue();
-        int dealerValue = dealer.Hand.GetTotalValue();
-        bool playerBusted = player.IsBusted;
-        bool dealerBusted = dealer.Hand.IsBust();
-
-        if (playerBusted)
-            return "Dealer Wins";
-        if (dealerBusted)
-            return "Player Wins";
-        if (playerValue > dealerValue)
-            return "Player Wins";
-        if (dealerValue > playerValue)
-            return "Dealer Wins";
-        return "Push";
+        return hand.Cards.Count == 2 && hand.GetTotalValue() == 21;
     }
-
-    // Prepared for future multiplayer serialization/extensions
-    // public string ToSerializableFormat() {...}
 }
