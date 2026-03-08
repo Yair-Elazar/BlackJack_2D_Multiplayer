@@ -6,7 +6,7 @@
 public class BlackjackGameManager
 {
     // Game state enums
-    public enum GameState { PlayerTurn, DealerTurn, Finished }
+    public enum GameState { Betting, PlayerTurn, DealerTurn, Finished }
     public enum RoundResult { PlayerWins, DealerWins, Push, PlayerBlackjack, DealerBlackjack }
 
     private Deck deck;
@@ -15,6 +15,10 @@ public class BlackjackGameManager
 
     private GameState gameState;
     private RoundResult? roundResult; // null if round not finished yet
+    
+    // Betting system
+    private int playerBalance = 1000; // Starting balance
+    private int currentBet = 0;
 
     /// <summary>
     /// The current player.
@@ -37,8 +41,18 @@ public class BlackjackGameManager
     public RoundResult? GetRoundResult() => roundResult;
 
     /// <summary>
+    /// Gets the player's current balance.
+    /// </summary>
+    public int PlayerBalance => playerBalance;
+
+    /// <summary>
+    /// Gets the current bet amount.
+    /// </summary>
+    public int CurrentBet => currentBet;
+
+    /// <summary>
     /// Starts a new round: resets deck, hands, and prepares for dealing.
-    /// Cards should be dealt using DealInitialCards() for animated dealing.
+    /// Sets state to Betting so player must place a bet first.
     /// </summary>
     public void StartNewRound(string playerName)
     {
@@ -55,8 +69,59 @@ public class BlackjackGameManager
         else
             dealer.ResetHand();
 
-        gameState = GameState.PlayerTurn;
+        gameState = GameState.Betting;
         roundResult = null;
+        currentBet = 0;
+    }
+
+    /// <summary>
+    /// Adds a chip value to the current bet. Returns true if successful.
+    /// </summary>
+    public bool AddToBet(int chipValue)
+    {
+        if (gameState != GameState.Betting)
+            return false;
+
+        if (chipValue <= 0)
+            return false;
+
+        int newBet = currentBet + chipValue;
+        if (newBet > playerBalance)
+            return false; // Can't bet more than balance
+
+        currentBet = newBet;
+        return true;
+    }
+
+    /// <summary>
+    /// Clears the current bet.
+    /// </summary>
+    public void ClearBet()
+    {
+        if (gameState == GameState.Betting)
+            currentBet = 0;
+    }
+
+    /// <summary>
+    /// Confirms the bet and starts the round. Returns true if bet was placed successfully.
+    /// </summary>
+    public bool ConfirmBet()
+    {
+        if (gameState != GameState.Betting)
+            return false;
+
+        if (currentBet <= 0)
+            return false; // Must bet something
+
+        if (currentBet > playerBalance)
+            return false; // Can't bet more than balance
+
+        // Deduct bet from balance
+        playerBalance -= currentBet;
+        
+        // Change state to PlayerTurn to allow dealing
+        gameState = GameState.PlayerTurn;
+        return true;
     }
 
     /// <summary>
@@ -106,6 +171,9 @@ public class BlackjackGameManager
                 roundResult = RoundResult.PlayerBlackjack;
             else
                 roundResult = RoundResult.DealerBlackjack;
+
+            // Update balance for immediate blackjack
+            UpdateBalance();
         }
     }
 
@@ -123,6 +191,8 @@ public class BlackjackGameManager
         {
             gameState = GameState.Finished;
             roundResult = RoundResult.DealerWins;
+            // Update balance (player loses, bet already deducted)
+            UpdateBalance();
             return true;
         }
 
@@ -154,6 +224,38 @@ public class BlackjackGameManager
             roundResult = RoundResult.PlayerWins;
         else
             roundResult = RoundResult.Push;
+
+        // Update balance based on result
+        UpdateBalance();
+    }
+
+    /// <summary>
+    /// Updates player balance based on round result.
+    /// </summary>
+    private void UpdateBalance()
+    {
+        if (currentBet <= 0)
+            return;
+
+        switch (roundResult)
+        {
+            case RoundResult.PlayerWins:
+                // Player wins: get bet back + equal amount (1:1 payout)
+                playerBalance += currentBet * 2;
+                break;
+            case RoundResult.PlayerBlackjack:
+                // Blackjack: get bet back + 1.5x bet (3:2 payout)
+                playerBalance += currentBet + (currentBet * 3 / 2);
+                break;
+            case RoundResult.DealerWins:
+            case RoundResult.DealerBlackjack:
+                // Dealer wins: bet is already deducted, nothing to add
+                break;
+            case RoundResult.Push:
+                // Push: get bet back (no win, no loss)
+                playerBalance += currentBet;
+                break;
+        }
     }
 
     /// <summary>

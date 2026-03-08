@@ -21,6 +21,18 @@ public class BlackjackUIManager : MonoBehaviour
     [SerializeField] private Button standButton;
     [SerializeField] private Button newRoundButton;
 
+    [Header("Betting UI")]
+    [SerializeField] private GameObject bettingPanel;
+    [SerializeField] private TextMeshProUGUI balanceText;
+    [SerializeField] private TextMeshProUGUI currentBetText;
+    [SerializeField] private Button chip10Button;
+    [SerializeField] private Button chip50Button;
+    [SerializeField] private Button chip100Button;
+    [SerializeField] private Button chip200Button;
+    [SerializeField] private Button chip500Button;
+    [SerializeField] private Button confirmBetButton;
+    [SerializeField] private Button clearBetButton;
+
     [Header("Animation Settings")]
     [SerializeField] private float cardDealDuration = 0.5f;
     [SerializeField] private float delayBetweenCards = 0.3f;
@@ -43,12 +55,36 @@ public class BlackjackUIManager : MonoBehaviour
             }
         }
         
-        StartNewRound();
+        // Setup betting UI
+        SetupBettingUI();
 
         // Add button listeners
         hitButton.onClick.AddListener(OnHit);
         standButton.onClick.AddListener(OnStand);
         newRoundButton.onClick.AddListener(StartNewRound);
+
+        // Start first round (will show betting UI)
+        StartNewRound();
+    }
+
+    private void SetupBettingUI()
+    {
+        // Add chip button listeners
+        if (chip10Button != null)
+            chip10Button.onClick.AddListener(() => OnChipClicked(10));
+        if (chip50Button != null)
+            chip50Button.onClick.AddListener(() => OnChipClicked(50));
+        if (chip100Button != null)
+            chip100Button.onClick.AddListener(() => OnChipClicked(100));
+        if (chip200Button != null)
+            chip200Button.onClick.AddListener(() => OnChipClicked(200));
+        if (chip500Button != null)
+            chip500Button.onClick.AddListener(() => OnChipClicked(500));
+
+        if (confirmBetButton != null)
+            confirmBetButton.onClick.AddListener(OnConfirmBet);
+        if (clearBetButton != null)
+            clearBetButton.onClick.AddListener(OnClearBet);
     }
 
     private void UpdateUI()
@@ -68,7 +104,7 @@ public class BlackjackUIManager : MonoBehaviour
             return;
         }
 
-        resultText.text = result.Value switch
+        string resultMessage = result.Value switch
         {
             BlackjackGameManager.RoundResult.PlayerWins => "Player Wins!",
             BlackjackGameManager.RoundResult.DealerWins => "Dealer Wins!",
@@ -77,6 +113,9 @@ public class BlackjackUIManager : MonoBehaviour
             BlackjackGameManager.RoundResult.DealerBlackjack => "Blackjack! Dealer Wins!",
             _ => string.Empty
         };
+
+        // Add balance info to result
+        resultText.text = $"{resultMessage}\nBalance: ${gameManager.PlayerBalance}";
     }
 
     public void StartNewRound()
@@ -93,8 +132,77 @@ public class BlackjackUIManager : MonoBehaviour
         standButton.interactable = false;
         resultText.text = string.Empty;
 
-        // Start animated dealing
-        StartCoroutine(DealInitialCards());
+        // Show betting UI
+        ShowBettingUI();
+    }
+
+    private void ShowBettingUI()
+    {
+        if (bettingPanel != null)
+            bettingPanel.SetActive(true);
+
+        UpdateBettingUI();
+    }
+
+    private void HideBettingUI()
+    {
+        if (bettingPanel != null)
+            bettingPanel.SetActive(false);
+    }
+
+    private void UpdateBettingUI()
+    {
+        // Update balance display
+        if (balanceText != null)
+            balanceText.text = $"Balance: ${gameManager.PlayerBalance}";
+
+        // Update current bet display
+        if (currentBetText != null)
+            currentBetText.text = $"Bet: ${gameManager.CurrentBet}";
+
+        // Update chip button interactability based on balance
+        int balance = gameManager.PlayerBalance;
+        int currentBet = gameManager.CurrentBet;
+        int availableBalance = balance - currentBet;
+
+        if (chip10Button != null)
+            chip10Button.interactable = availableBalance >= 10;
+        if (chip50Button != null)
+            chip50Button.interactable = availableBalance >= 50;
+        if (chip100Button != null)
+            chip100Button.interactable = availableBalance >= 100;
+        if (chip200Button != null)
+            chip200Button.interactable = availableBalance >= 200;
+        if (chip500Button != null)
+            chip500Button.interactable = availableBalance >= 500;
+
+        // Confirm bet button only enabled if bet > 0
+        if (confirmBetButton != null)
+            confirmBetButton.interactable = currentBet > 0;
+    }
+
+    private void OnChipClicked(int chipValue)
+    {
+        if (gameManager.AddToBet(chipValue))
+        {
+            UpdateBettingUI();
+        }
+    }
+
+    private void OnClearBet()
+    {
+        gameManager.ClearBet();
+        UpdateBettingUI();
+    }
+
+    private void OnConfirmBet()
+    {
+        if (gameManager.ConfirmBet())
+        {
+            HideBettingUI();
+            // Start animated dealing
+            StartCoroutine(DealInitialCards());
+        }
     }
 
 
@@ -244,6 +352,12 @@ public class BlackjackUIManager : MonoBehaviour
         else
         {
             dealerText.text = $"Dealer: {gameManager.Dealer.Hand.ToString()}";
+        }
+
+        // Update balance display if betting panel is visible
+        if (bettingPanel != null && bettingPanel.activeSelf)
+        {
+            UpdateBettingUI();
         }
     }
 
