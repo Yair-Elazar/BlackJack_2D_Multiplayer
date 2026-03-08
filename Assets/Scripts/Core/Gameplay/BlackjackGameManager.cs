@@ -37,7 +37,8 @@ public class BlackjackGameManager
     public RoundResult? GetRoundResult() => roundResult;
 
     /// <summary>
-    /// Starts a new round: resets deck, hands, deals cards, and handles immediate Blackjack.
+    /// Starts a new round: resets deck, hands, and prepares for dealing.
+    /// Cards should be dealt using DealInitialCards() for animated dealing.
     /// </summary>
     public void StartNewRound(string playerName)
     {
@@ -56,15 +57,42 @@ public class BlackjackGameManager
 
         gameState = GameState.PlayerTurn;
         roundResult = null;
+    }
 
-        // Deal two cards to player and dealer
-        for (int i = 0; i < 2; i++)
-        {
-            player.Hit(deck);
-            dealer.Hand.AddCard(deck.DrawCard());
-        }
+    /// <summary>
+    /// Deals one card to the specified target (player or dealer).
+    /// Returns the card that was dealt, or null if deck is empty.
+    /// </summary>
+    public Card DealCardToPlayer()
+    {
+        if (deck.Count == 0)
+            return null;
+        
+        var card = deck.DrawCard();
+        player.Hand.AddCard(card);
+        return card;
+    }
 
-        // Check for immediate Blackjack
+    /// <summary>
+    /// Deals one card to the dealer.
+    /// Returns the card that was dealt, or null if deck is empty.
+    /// </summary>
+    public Card DealCardToDealer()
+    {
+        if (deck.Count == 0)
+            return null;
+        
+        var card = deck.DrawCard();
+        dealer.Hand.AddCard(card);
+        return card;
+    }
+
+    /// <summary>
+    /// Checks for immediate Blackjack after initial dealing is complete.
+    /// Should be called after all 4 initial cards are dealt.
+    /// </summary>
+    public void CheckInitialBlackjack()
+    {
         bool playerBJ = IsBlackjack(player.Hand);
         bool dealerBJ = IsBlackjack(dealer.Hand);
 
