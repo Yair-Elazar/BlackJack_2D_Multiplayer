@@ -265,4 +265,16 @@ public class BlackjackGameManager
     {
         return hand.Cards.Count == 2 && hand.GetTotalValue() == 21;
     }
+
+    public void PrepareNextRound()
+    {
+        if (gameState != GameState.Finished)
+            return;
+
+        player.ResetHand();
+        dealer.ResetHand();
+        roundResult = null;
+        currentBet = 0;
+        gameState = GameState.Betting;
+    }
 }
