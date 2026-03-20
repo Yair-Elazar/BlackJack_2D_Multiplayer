@@ -28,7 +28,22 @@ MemoryCaptures/
 *.bak
 *.old
 
-# Do NOT ignore these project files
+# Firebase large binaries (iOS, x86_64, tvOS)
+Assets/Firebase/Plugins/x86_64/*.bundle
+Assets/Firebase/Plugins/x86_64/*.so
+Assets/Firebase/Plugins/iOS/*.a
+Assets/Firebase/Plugins/tvOS/*.a
+
+# External Dependency Manager (Google Play / iOS Resolver)
+Assets/ExternalDependencyManager/
+
+# Streaming assets that are automatically generated or sensitive
+Assets/StreamingAssets/google-services*.json
+
+# Editor default resources (large images/icons)
+Assets/Editor\ Default\ Resources/
+
+# Do NOT ignore these project folders
 !Assets/
 !Packages/
 !ProjectSettings/
