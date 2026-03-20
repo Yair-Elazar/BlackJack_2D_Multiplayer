@@ -8,6 +8,7 @@ public class Player
     /// The player's display name.
     /// </summary>
     public string Name { get; private set; }
+    public string Id { get; private set; }
 
     private readonly Hand hand = new Hand();
 
@@ -30,10 +31,11 @@ public class Player
     /// Initializes a new player with the specified name.
     /// </summary>
     /// <param name="name">Player's display name.</param>
-    public Player(string name)
-    {
-        Name = name;
-    }
+    public Player(string id, string name)
+{
+    Id = id;
+    Name = name;
+}
 
     /// <summary>
     /// Draws a card from the deck and adds it to the player's hand.

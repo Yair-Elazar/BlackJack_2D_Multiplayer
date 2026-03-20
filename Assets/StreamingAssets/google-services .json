@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "590942052950",
+    "project_id": "blackjack-unity",
+    "storage_bucket": "blackjack-unity.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:590942052950:android:66b9e37ecd50484c8111f7",
+        "android_client_info": {
+          "package_name": "com.yair.blackjack"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDhsU48nUzLh3fkDdcdwwmkR8yHJVuX7-A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
