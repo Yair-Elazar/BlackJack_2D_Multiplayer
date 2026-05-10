@@ -24,7 +24,6 @@ public class BlackjackUIManager : MonoBehaviour
     [SerializeField] private Button chip10Button;
     [SerializeField] private Button chip50Button;
     [SerializeField] private Button chip100Button;
-    [SerializeField] private Button chip200Button;
     [SerializeField] private Button chip500Button;
     [SerializeField] private Button confirmBetButton;
     [SerializeField] private Button clearBetButton;
@@ -34,11 +33,10 @@ public class BlackjackUIManager : MonoBehaviour
     [SerializeField] private float delayBetweenCards = 0.1f;
 
     private BlackjackGameManager gameManager;
-    private string playerId = "player1"; 
-    private PlayerData currentPlayerData = null;
+    private PlayerData currentPlayerData;
     private bool isDealing = false;
 
-    // Singleton pattern
+    // Singleton
     public static BlackjackUIManager Instance { get; private set; }
 
     private void Awake()
@@ -64,45 +62,38 @@ public class BlackjackUIManager : MonoBehaviour
         StartCoroutine(InitializeGame());
     }
 
-    private void SetupBettingUI()
+    // =========================
+    // INIT
+    // =========================
+    private IEnumerator InitializeGame()
     {
-        if (chip10Button != null) chip10Button.onClick.AddListener(() => OnChipClicked(10));
-        if (chip50Button != null) chip50Button.onClick.AddListener(() => OnChipClicked(50));
-        if (chip100Button != null) chip100Button.onClick.AddListener(() => OnChipClicked(100));
-        if (chip200Button != null) chip200Button.onClick.AddListener(() => OnChipClicked(200));
-        if (chip500Button != null) chip500Button.onClick.AddListener(() => OnChipClicked(500));
+        yield return new WaitUntil(() => FirestoreManager.Instance != null);
 
-        if (confirmBetButton != null) confirmBetButton.onClick.AddListener(OnConfirmBet);
-        if (clearBetButton != null) clearBetButton.onClick.AddListener(OnClearBet);
-    }
-
-    private void UpdateResultText()
-    {
-        var result = gameManager.GetRoundResult();
-        if (!result.HasValue)
+        if (!PlayerSession.IsLoggedIn)
         {
-            resultText.text = "";
-            return;
+            Debug.LogError("❌ No logged-in player found in PlayerSession");
+            yield break;
         }
 
-        string resultMessage = result.Value switch
-        {
-            BlackjackGameManager.RoundResult.PlayerWins => "Player Wins!",
-            BlackjackGameManager.RoundResult.DealerWins => "Dealer Wins!",
-            BlackjackGameManager.RoundResult.Push => "Push!",
-            BlackjackGameManager.RoundResult.PlayerBlackjack => "Blackjack! Player Wins!",
-            BlackjackGameManager.RoundResult.DealerBlackjack => "Blackjack! Dealer Wins!",
-            _ => ""
-        };
+        currentPlayerData = PlayerSession.CurrentPlayer;
 
-        resultText.text = $"{resultMessage}\nBalance: ${gameManager.PlayerBalance}";
+        gameManager = new BlackjackGameManager();
+        gameManager.SetBalance(currentPlayerData.Balance);
+        UpdateBettingUI();
+
+        Debug.Log("✅ Game initialized for: " + currentPlayerData.Name);
+
+        StartNewRound();
     }
 
+    // =========================
+    // GAME FLOW
+    // =========================
     public void StartNewRound()
     {
         if (isDealing) return;
 
-        gameManager.StartNewRound(playerId);
+        gameManager.StartNewRound(currentPlayerData.Id);
 
         ClearHandUI(playerHandContainer);
         ClearHandUI(dealerHandContainer);
@@ -115,51 +106,76 @@ public class BlackjackUIManager : MonoBehaviour
         ShowBettingUI();
     }
 
-    private void ShowBettingUI()
+    private void OnHit()
+{
+    if (isDealing) return;
+
+    StartCoroutine(HandleHit());
+}
+
+private IEnumerator HandleHit()
+{
+    isDealing = true;
+
+    bool busted = gameManager.PlayerHit();
+
+    Card card = gameManager.Player.Hand.Cards[^1];
+    yield return AnimateCardDeal(card, playerHandContainer, false);
+
+    UpdateUIText();
+
+    isDealing = false;
+
+    if (busted || gameManager.CurrentState == BlackjackGameManager.GameState.Finished)
+        EndRound();
+}
+
+    private IEnumerator DealHitCard()
     {
-        if (bettingPanel != null) bettingPanel.SetActive(true);
+        isDealing = true;
+
+        Card card = gameManager.Player.Hand.Cards[^1];
+        yield return StartCoroutine(AnimateCardDeal(card, playerHandContainer, false));
+
+        UpdateUIText();
+        isDealing = false;
+    }
+
+    private void OnStand()
+    {
+        if (isDealing) return;
+        StartCoroutine(RevealDealerAndPlay());
+    }
+
+    // =========================
+    // BETTING
+    // =========================
+    private void SetupBettingUI()
+    {
+        chip10Button.onClick.AddListener(() => OnChipClicked(10));
+        chip50Button.onClick.AddListener(() => OnChipClicked(50));
+        chip100Button.onClick.AddListener(() => OnChipClicked(100));
+        chip500Button.onClick.AddListener(() => OnChipClicked(500));
+
+        confirmBetButton.onClick.AddListener(OnConfirmBet);
+        clearBetButton.onClick.AddListener(OnClearBet);
+    }
+
+   private void OnChipClicked(int value)
+{
+    Debug.Log("Chip clicked: " + value);
+
+    bool success = gameManager.AddToBet(value);
+
+    Debug.Log("Current state: " + gameManager.CurrentState);
+    Debug.Log("AddToBet success: " + success);
+    Debug.Log("Current bet: " + gameManager.CurrentBet);
+
+    if (success)
+    {
         UpdateBettingUI();
     }
-
-    private void HideBettingUI()
-    {
-        if (bettingPanel != null) bettingPanel.SetActive(false);
-    }
-
-    private void UpdateBettingUI()
-    {
-        if (balanceText != null)
-            balanceText.text = $"Balance: ${gameManager.PlayerBalance}";
-
-        if (currentBetText != null)
-            currentBetText.text = $"Bet: ${gameManager.CurrentBet}";
-
-        int balance = gameManager.PlayerBalance;
-        int currentBet = gameManager.CurrentBet;
-        int availableBalance = balance - currentBet;
-
-        if (chip10Button != null) chip10Button.interactable = availableBalance >= 10;
-        if (chip50Button != null) chip50Button.interactable = availableBalance >= 50;
-        if (chip100Button != null) chip100Button.interactable = availableBalance >= 100;
-        if (chip200Button != null) chip200Button.interactable = availableBalance >= 200;
-        if (chip500Button != null) chip500Button.interactable = availableBalance >= 500;
-
-        if (confirmBetButton != null) confirmBetButton.interactable = currentBet > 0;
-    }
-
-    private void OnChipClicked(int chipValue)
-    {
-        if (gameManager.AddToBet(chipValue))
-        {
-            UpdateBettingUI();
-
-            if (currentPlayerData != null)
-            {
-                currentPlayerData.CurrentBet = gameManager.CurrentBet;
-                FirestoreManager.Instance?.SavePlayer(currentPlayerData);
-            }
-        }
-    }
+}
 
     private void OnClearBet()
     {
@@ -168,44 +184,107 @@ public class BlackjackUIManager : MonoBehaviour
     }
 
     private void OnConfirmBet()
-    {
-        if (gameManager.ConfirmBet())
-        {
-            if (currentPlayerData != null)
-            {
-                currentPlayerData.CurrentBet = gameManager.CurrentBet;
-                FirestoreManager.Instance?.SavePlayer(currentPlayerData);
-            }
+{
+    Debug.Log("CONFIRM BET CLICKED");
 
-            HideBettingUI();
-            StartCoroutine(DealInitialCards());
-        }
+    if (gameManager == null)
+    {
+        Debug.LogError("❌ gameManager NULL");
+        return;
     }
 
-    private void ClearHandUI(Transform container)
+    Debug.Log("Current bet before confirm: " + gameManager.CurrentBet);
+    Debug.Log("Balance before confirm: " + gameManager.PlayerBalance);
+
+    bool success = gameManager.ConfirmBet();
+
+    Debug.Log("ConfirmBet result: " + success);
+
+    if (!success)
     {
-        foreach (Transform child in container)
-            Destroy(child.gameObject);
+        Debug.LogError("❌ ConfirmBet failed");
+        return;
     }
 
+    Debug.Log("Balance after confirm: " + gameManager.PlayerBalance);
+
+    currentPlayerData.CurrentBet = gameManager.CurrentBet;
+
+    FirestoreManager.Instance?.SavePlayer(currentPlayerData);
+
+    Debug.Log("Hiding betting UI");
+
+    HideBettingUI();
+
+    Debug.Log("Starting DealInitialCards coroutine");
+
+    StartCoroutine(DealInitialCards());
+}
+
+    // =========================
+    // ROUND END
+    // =========================
+    private void EndRound()
+    {
+        UpdateResultText();
+
+        hitButton.interactable = false;
+        standButton.interactable = false;
+
+        currentPlayerData.Balance = gameManager.PlayerBalance;
+        currentPlayerData.CurrentBet = 0;
+
+        StartCoroutine(SavePlayerCoroutine());
+
+        FirestoreManager.Instance.SaveRound(
+            new RoundData(
+                currentPlayerData.Id,
+                gameManager.GetRoundResult().ToString(),
+                gameManager.CurrentBet,
+                gameManager.PlayerBalance
+            )
+        );
+
+        StartCoroutine(ReturnToBettingAfterDelay());
+    }
+
+    private IEnumerator SavePlayerCoroutine()
+    {
+        var task = FirestoreManager.Instance.SavePlayer(currentPlayerData);
+        yield return new WaitUntil(() => task.IsCompleted);
+    }
+
+    private IEnumerator ReturnToBettingAfterDelay()
+    {
+        yield return new WaitForSeconds(2f);
+
+        gameManager.PrepareNextRound();
+
+        ClearHandUI(playerHandContainer);
+        ClearHandUI(dealerHandContainer);
+
+        resultText.text = "";
+
+        ShowBettingUI();
+    }
+
+    // =========================
+    // DEALING
+    // =========================
     private IEnumerator DealInitialCards()
     {
         isDealing = true;
 
-        Card card1 = gameManager.DealCardToPlayer();
-        yield return StartCoroutine(AnimateCardDeal(card1, playerHandContainer, false));
+        yield return DealCardToPlayer();
         yield return new WaitForSeconds(delayBetweenCards);
 
-        Card card2 = gameManager.DealCardToDealer();
-        yield return StartCoroutine(AnimateCardDeal(card2, dealerHandContainer, true));
+        yield return DealCardToDealer(true);
         yield return new WaitForSeconds(delayBetweenCards);
 
-        Card card3 = gameManager.DealCardToPlayer();
-        yield return StartCoroutine(AnimateCardDeal(card3, playerHandContainer, false));
+        yield return DealCardToPlayer();
         yield return new WaitForSeconds(delayBetweenCards);
 
-        Card card4 = gameManager.DealCardToDealer();
-        yield return StartCoroutine(AnimateCardDeal(card4, dealerHandContainer, false));
+        yield return DealCardToDealer(false);
 
         gameManager.CheckInitialBlackjack();
         UpdateUIText();
@@ -223,226 +302,172 @@ public class BlackjackUIManager : MonoBehaviour
         isDealing = false;
     }
 
-    private IEnumerator AnimateCardDeal(Card card, Transform targetContainer, bool faceDown)
+    private IEnumerator DealCardToPlayer()
     {
-        if (card == null || deckPosition == null) yield break;
-
-        Canvas canvas = deckPosition.GetComponentInParent<Canvas>();
-        Transform canvasRoot = canvas != null ? canvas.transform : deckPosition.root;
-
-        GameObject cardGO = Instantiate(cardViewPrefab, canvasRoot);
-        CardView view = cardGO.GetComponent<CardView>();
-        view.SetCard(card, true);
-
-        RectTransform cardRect = cardGO.GetComponent<RectTransform>();
-        RectTransform deckRect = deckPosition.GetComponent<RectTransform>();
-        RectTransform targetRect = targetContainer.GetComponent<RectTransform>();
-
-        Vector2 startWorldPos = deckRect.position;
-        Vector2 endWorldPos = targetRect.position;
-
-        float elapsed = 0f;
-        while (elapsed < cardDealDuration)
-        {
-            elapsed += Time.deltaTime;
-            float t = Mathf.SmoothStep(0f, 1f, elapsed / cardDealDuration);
-            cardRect.position = Vector2.Lerp(startWorldPos, endWorldPos, t);
-            yield return null;
-        }
-
-        cardGO.transform.SetParent(targetContainer, false);
-        cardRect.anchoredPosition = Vector2.zero;
-
-        if (!faceDown)
-            yield return StartCoroutine(view.FlipCard(card));
+        Card card = gameManager.DealCardToPlayer();
+        yield return AnimateCardDeal(card, playerHandContainer, false);
     }
+
+    private IEnumerator DealCardToDealer(bool faceDown)
+    {
+        Card card = gameManager.DealCardToDealer();
+        yield return AnimateCardDeal(card, dealerHandContainer, faceDown);
+    }
+
+    // =========================
+    // UI HELPERS
+    // =========================
+    private void ShowBettingUI()
+{
+    bettingPanel.SetActive(true);
+    UpdateBettingUI();
+}
+    private void HideBettingUI() => bettingPanel.SetActive(false);
+
+    private void ClearHandUI(Transform container)
+    {
+        foreach (Transform child in container)
+            Destroy(child.gameObject);
+    }
+
+    private void UpdateBettingUI()
+{
+    if (gameManager == null)
+        return;
+
+    if (balanceText != null)
+        balanceText.text = $"Balance: ${gameManager.PlayerBalance}";
+
+    if (currentBetText != null)
+        currentBetText.text = $"Bet: ${gameManager.CurrentBet}";
+}
 
     private void UpdateUIText()
     {
         playerText.text = $"Player: {gameManager.Player.Hand}";
-
-        if (gameManager.Dealer.Hand.Cards.Count > 0 &&
-            gameManager.CurrentState == BlackjackGameManager.GameState.PlayerTurn)
-        {
-            if (gameManager.Dealer.Hand.Cards.Count == 1)
-                dealerText.text = "Dealer: ?";
-            else
-            {
-                var visibleCard = gameManager.Dealer.Hand.Cards[1];
-                dealerText.text = $"Dealer: ?, {visibleCard} (Total: ?)";
-            }
-        }
-        else
-            dealerText.text = $"Dealer: {gameManager.Dealer.Hand}";
-
-        if (bettingPanel != null && bettingPanel.activeSelf)
-            UpdateBettingUI();
+        dealerText.text = $"Dealer: {gameManager.Dealer.Hand}";
     }
 
-    private void OnHit()
+    private void UpdateResultText()
     {
-        if (isDealing) return;
-
-        bool busted = gameManager.PlayerHit();
-        StartCoroutine(DealHitCard());
-
-        if (busted || gameManager.CurrentState == BlackjackGameManager.GameState.Finished)
-            EndRound();
-    }
-
-    private IEnumerator DealHitCard()
-    {
-        isDealing = true;
-
-        Card card = gameManager.Player.Hand.Cards[^1];
-        yield return StartCoroutine(AnimateCardDeal(card, playerHandContainer, false));
-
-        UpdateUIText();
-        isDealing = false;
-    }
-
-    private void OnStand()
-    {
-        if (isDealing) return;
-
-        StartCoroutine(RevealDealerAndPlay());
-    }
-
-    private IEnumerator RevealDealerAndPlay()
-    {
-        isDealing = true;
-
-        hitButton.interactable = false;
-        standButton.interactable = false;
-
-        if (dealerHandContainer.childCount > 0)
-        {
-            Transform firstCard = dealerHandContainer.GetChild(0);
-            CardView view = firstCard.GetComponent<CardView>();
-
-            if (view != null && gameManager.Dealer.Hand.Cards.Count > 0)
-                view.SetCard(gameManager.Dealer.Hand.Cards[0], false);
-        }
-
-        UpdateUIText();
-        yield return new WaitForSeconds(0.5f);
-
-        int initialDealerCardCount = gameManager.Dealer.Hand.Cards.Count;
-        gameManager.PlayerStand();
-        int currentCardCount = gameManager.Dealer.Hand.Cards.Count;
-
-        for (int i = initialDealerCardCount; i < currentCardCount; i++)
-        {
-            Card card = gameManager.Dealer.Hand.Cards[i];
-            yield return StartCoroutine(AnimateCardDeal(card, dealerHandContainer, false));
-            yield return new WaitForSeconds(delayBetweenCards);
-        }
-
-        UpdateUIText();
-        isDealing = false;
-
-        EndRound();
-    }
-
-    private void EndRound()
-    {
-        UpdateResultText();
-
-        hitButton.interactable = false;
-        standButton.interactable = false;
-
-        SaveRoundToFirestore();
-
-        StartCoroutine(ReturnToBettingAfterDelay());
-    }
-
-    private IEnumerator ReturnToBettingAfterDelay()
-    {
-        yield return new WaitForSeconds(2f);
-
-        if (gameManager.CurrentState != BlackjackGameManager.GameState.Finished)
-            yield break;
-
-        gameManager.PrepareNextRound();
-
-        ClearHandUI(playerHandContainer);
-        ClearHandUI(dealerHandContainer);
-
-        resultText.text = "";
-
-        ShowBettingUI();
-    }
-
-    private IEnumerator InitializeGame()
-    {
-        yield return new WaitUntil(() => FirestoreManager.Instance != null);
-
-        Debug.Log("Loading player with ID: " + playerId);
-        var task = FirestoreManager.Instance.LoadPlayer(playerId);
-
-        yield return new WaitUntil(() => task.IsCompleted);
-
-        if (task.Exception != null)
-        {
-            Debug.LogError("Firestore load failed: " + task.Exception);
-            yield break;
-        }
-
-        if (task.Result != null)
-        {
-            currentPlayerData = task.Result;
-            gameManager = new BlackjackGameManager();
-            gameManager.SetBalance(currentPlayerData.Balance);
-            Debug.Log("✅ Loaded balance: " + currentPlayerData.Balance);
-        }
-        else
-        {
-            Debug.LogError("Player not found in DB!");
-            yield break;
-        }
-
-        StartNewRound();
-    }
-
-    private void SaveRoundToFirestore()
-    {
-        if (FirestoreManager.Instance == null || currentPlayerData == null) return;
-
         var result = gameManager.GetRoundResult();
-        string resultString = result.HasValue ? result.Value.ToString() : "Unknown";
 
-        int balance = gameManager.PlayerBalance;
-        int bet = gameManager.CurrentBet;
-
-        currentPlayerData.Balance = balance;
-        currentPlayerData.CurrentBet = 0;
-
-        StartCoroutine(SavePlayerCoroutine());
-
-        RoundData round = new RoundData(playerId, resultString, bet, balance);
-        FirestoreManager.Instance.SaveRound(round);
+        resultText.text = result.HasValue
+            ? result.Value.ToString()
+            : "";
     }
 
-    private IEnumerator SavePlayerCoroutine()
-    {
-        var task = FirestoreManager.Instance.SavePlayer(currentPlayerData);
-        yield return new WaitUntil(() => task.IsCompleted);
-
-        if (task.Exception != null)
-            Debug.LogError("Save failed: " + task.Exception);
-        else
-            Debug.Log("✅ Save completed to Firestore!");
-    }
-    // בתוך BlackjackUIManager
-public void SetCurrentPlayerData(PlayerData playerData)
+    // =========================
+    // ANIMATION
+    // =========================
+    private IEnumerator AnimateCardDeal(Card card, Transform target, bool faceDown)
 {
-    currentPlayerData = playerData;
+    if (card == null) yield break;
 
-    // עדכון ה־GameManager עם ה־balance של השחקן
-    if (gameManager == null) gameManager = new BlackjackGameManager();
-    gameManager.SetBalance(playerData.Balance);
+    GameObject go = Instantiate(cardViewPrefab, deckPosition.parent);
+    RectTransform rect = go.GetComponent<RectTransform>();
+    CardView view = go.GetComponent<CardView>();
 
-    // עדכון UI במידת הצורך
-    UpdateBettingUI();
+    RectTransform deckRect = deckPosition.GetComponent<RectTransform>();
+    RectTransform targetRect = target.GetComponent<RectTransform>();
+
+    Vector3 startPos = deckRect.position;
+    Vector3 endPos = targetRect.position;
+
+    rect.position = startPos;
+    rect.localScale = Vector3.one;
+
+    // 🔥 IMPORTANT: set card IMMEDIATELY (but face down)
+    view.SetCard(card, true);
+
+    float t = 0f;
+
+    while (t < cardDealDuration)
+    {
+        t += Time.deltaTime;
+        float p = t / cardDealDuration;
+
+        rect.position = Vector3.Lerp(startPos, endPos, p);
+
+        yield return null;
+    }
+
+    rect.position = endPos;
+
+    // flip reveal only at end
+    if (!faceDown)
+        yield return StartCoroutine(view.FlipCard(card));
+    else
+        view.SetCard(card, true);
+
+    rect.SetParent(target, false);
+}
+    private IEnumerator RevealDealerAndPlay()
+{
+    isDealing = true;
+
+    hitButton.interactable = false;
+    standButton.interactable = false;
+
+    if (dealerHandContainer.childCount > 0)
+    {
+        Transform firstCard = dealerHandContainer.GetChild(0);
+        CardView view = firstCard.GetComponent<CardView>();
+
+        if (view != null && gameManager.Dealer.Hand.Cards.Count > 0)
+            view.SetCard(gameManager.Dealer.Hand.Cards[0], false);
+    }
+
+    UpdateUIText();
+    yield return new WaitForSeconds(0.5f);
+
+    int initialDealerCardCount = gameManager.Dealer.Hand.Cards.Count;
+    gameManager.PlayerStand();
+    int currentCardCount = gameManager.Dealer.Hand.Cards.Count;
+
+    for (int i = initialDealerCardCount; i < currentCardCount; i++)
+    {
+        Card card = gameManager.Dealer.Hand.Cards[i];
+        yield return StartCoroutine(AnimateCardDeal(card, dealerHandContainer, false));
+        yield return new WaitForSeconds(delayBetweenCards);
+    }
+
+    UpdateUIText();
+    isDealing = false;
+
+    EndRound();
+}
+private IEnumerator FlipCard(CardView view, bool faceDown)
+{
+    RectTransform rect = view.GetComponent<RectTransform>();
+
+    float t = 0f;
+    float duration = 0.15f;
+
+    while (t < duration)
+    {
+        t += Time.deltaTime;
+        float p = t / duration;
+
+        rect.localScale = new Vector3(1 - p, 1, 1);
+
+        yield return null;
+    }
+
+    //view.SetFaceDown(faceDown);
+
+    t = 0f;
+
+    while (t < duration)
+    {
+        t += Time.deltaTime;
+        float p = t / duration;
+
+        rect.localScale = new Vector3(p, 1, 1);
+
+        yield return null;
+    }
+
+    rect.localScale = Vector3.one;
 }
 }

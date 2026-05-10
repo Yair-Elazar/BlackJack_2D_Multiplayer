@@ -620,7 +620,6 @@ MonoBehaviour:
   chip10Button: {fileID: 2200000012}
   chip50Button: {fileID: 586015112}
   chip100Button: {fileID: 1158352460}
-  chip200Button: {fileID: 0}
   chip500Button: {fileID: 345761956}
   confirmBetButton: {fileID: 2200000020}
   clearBetButton: {fileID: 2200000028}
@@ -3521,7 +3520,7 @@ MonoBehaviour:
     m_PressedTrigger: Pressed
     m_SelectedTrigger: Selected
     m_DisabledTrigger: Disabled
-  m_Interactable: 0
+  m_Interactable: 1
   m_TargetGraphic: {fileID: 2200000021}
   m_OnClick:
     m_PersistentCalls:
