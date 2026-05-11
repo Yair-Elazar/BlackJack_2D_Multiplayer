@@ -232,6 +232,15 @@ public class BlackjackGameManager
         UpdateBalance();
     }
 
+    public bool CanSplit()
+{
+    if (player.Hand.Cards.Count != 2)
+        return false;
+
+    return player.Hand.Cards[0].Rank ==
+           player.Hand.Cards[1].Rank;
+}
+
     // =========================
     // BALANCE
     // =========================

@@ -16,6 +16,7 @@ public class BlackjackUIManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI resultText;
     [SerializeField] private Button hitButton;
     [SerializeField] private Button standButton;
+    [SerializeField] private Button splitButton;
 
     [Header("Betting UI")]
     [SerializeField] private GameObject bettingPanel;
@@ -102,6 +103,7 @@ public class BlackjackUIManager : MonoBehaviour
         standButton.interactable = false;
 
         resultText.text = "";
+        splitButton.gameObject.SetActive(false);
 
         ShowBettingUI();
     }
@@ -288,6 +290,7 @@ private IEnumerator HandleHit()
 
         gameManager.CheckInitialBlackjack();
         UpdateUIText();
+        splitButton.gameObject.SetActive(gameManager.CanSplit());
 
         if (gameManager.CurrentState != BlackjackGameManager.GameState.Finished)
         {
@@ -363,6 +366,7 @@ private IEnumerator HandleHit()
     private IEnumerator AnimateCardDeal(Card card, Transform target, bool faceDown)
 {
     if (card == null) yield break;
+    AudioManager.Instance?.PlayCardDeal(); 
 
     GameObject go = Instantiate(cardViewPrefab, deckPosition.parent);
     RectTransform rect = go.GetComponent<RectTransform>();
