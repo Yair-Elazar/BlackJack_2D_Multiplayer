@@ -7,8 +7,10 @@ public class BlackjackGameManagerTests
     public void NewRound_DealsTwoCardsToPlayerAndDealer()
     {
         var manager = new BlackjackGameManager();
+
         manager.StartNewRound("TestPlayer");
-        Assert.AreEqual(2, manager.Player.Hand.Cards.Count);
+
+        Assert.AreEqual(2, manager.Player.Hands[0].Hand.Cards.Count);
         Assert.AreEqual(2, manager.Dealer.Hand.Cards.Count);
     }
 
@@ -16,10 +18,15 @@ public class BlackjackGameManagerTests
     public void PlayerHit_IncreasesPlayerCardCount()
     {
         var manager = new BlackjackGameManager();
+
         manager.StartNewRound("Tester");
-        int before = manager.Player.Hand.Cards.Count;
-        manager.PlayerHit();
-        int after = manager.Player.Hand.Cards.Count;
+
+        int before = manager.Player.Hands[0].Hand.Cards.Count;
+
+        manager.PlayerHit(0);
+
+        int after = manager.Player.Hands[0].Hand.Cards.Count;
+
         Assert.AreEqual(before + 1, after);
     }
 
@@ -27,40 +34,60 @@ public class BlackjackGameManagerTests
     public void PlayerBust_EndsRoundWithDealerWins()
     {
         var manager = new BlackjackGameManager();
+
         manager.StartNewRound("Buster");
-        // Manually set hand to bust
-        var hand = manager.Player.Hand;
+
+        var hand = manager.Player.Hands[0].Hand;
+
         hand.AddCard(new Card(Card.RankType.King, Card.SuitType.Spades));
         hand.AddCard(new Card(Card.RankType.Queen, Card.SuitType.Hearts));
         hand.AddCard(new Card(Card.RankType.Two, Card.SuitType.Diamonds));
-        // Next hit triggers check
-        manager.PlayerHit();
+
+        manager.PlayerHit(0);
+
         Assert.AreEqual(BlackjackGameManager.GameState.Finished, manager.CurrentState);
         Assert.AreEqual(BlackjackGameManager.RoundResult.DealerWins, manager.GetRoundResult());
     }
 
     [Test]
-    public void PlayerStand_TriggersDealerTurnAndFinishesRound()
-    {
-        var manager = new BlackjackGameManager();
-        manager.StartNewRound("DealerDealer");
-        manager.PlayerStand();
-        Assert.AreEqual(BlackjackGameManager.GameState.Finished, manager.CurrentState);
-        Assert.IsNotNull(manager.GetRoundResult());
-    }
+public void DealerTurn_FinishesRound()
+{
+    var manager = new BlackjackGameManager();
+
+    manager.StartNewRound("DealerDealer");
+
+    manager.ConfirmBet();
+
+    manager.DealCardToPlayer(0);
+    manager.DealCardToDealer();
+
+    manager.DealCardToPlayer(0);
+    manager.DealCardToDealer();
+
+    manager.PlayerStand();
+
+    Assert.AreEqual(
+        BlackjackGameManager.GameState.Finished,
+        manager.CurrentState
+    );
+}
 
     [Test]
     public void ImmediateBlackjack_DetectedCorrectly()
     {
         var manager = new BlackjackGameManager();
+
         manager.StartNewRound("BlackjackPlayer");
-        var playerValue = manager.Player.Hand.GetTotalValue();
-        var dealerValue = manager.Dealer.Hand.GetTotalValue();
-        if (playerValue == 21 && manager.Player.Hand.Cards.Count == 2)
+
+        var playerHand = manager.Player.Hands[0].Hand;
+        var dealerHand = manager.Dealer.Hand;
+
+        if (playerHand.GetTotalValue() == 21 && playerHand.Cards.Count == 2)
         {
             Assert.AreEqual(BlackjackGameManager.RoundResult.PlayerBlackjack, manager.GetRoundResult());
         }
-        if (dealerValue == 21 && manager.Dealer.Hand.Cards.Count == 2)
+
+        if (dealerHand.GetTotalValue() == 21 && dealerHand.Cards.Count == 2)
         {
             Assert.AreEqual(BlackjackGameManager.RoundResult.DealerBlackjack, manager.GetRoundResult());
         }

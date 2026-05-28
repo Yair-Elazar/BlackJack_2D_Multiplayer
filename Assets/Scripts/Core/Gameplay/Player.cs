@@ -1,69 +1,89 @@
-/// <summary>
-/// Represents a player in a Blackjack game.
-/// Encapsulates player identity and hand management. Prepared for multiplayer usage and extension.
-/// </summary>
+using System.Collections.Generic;
+
 public class Player
 {
-    /// <summary>
-    /// The player's display name.
-    /// </summary>
     public string Name { get; private set; }
     public string Id { get; private set; }
 
-    private readonly Hand hand = new Hand();
+    public List<HandState> Hands { get; private set; } = new();
 
-    /// <summary>
-    /// Gets the player's current hand (read-only).
-    /// </summary>
-    public Hand Hand => hand;
+    public HandState ActiveHand
+    {
+        get
+        {
+            return Hands.Find(h => h.IsActive) ?? Hands[0];
+        }
+    }
 
-    /// <summary>
-    /// Returns true if the player's hand value exceeds 21.
-    /// </summary>
-    public bool IsBusted => hand.IsBust();
-
-    /// <summary>
-    /// Returns true if the player's hand value is exactly 21 (Blackjack).
-    /// </summary>
-    public bool HasBlackjack => hand.GetTotalValue() == 21;
-
-    /// <summary>
-    /// Initializes a new player with the specified name.
-    /// </summary>
-    /// <param name="name">Player's display name.</param>
     public Player(string id, string name)
-{
-    Id = id;
-    Name = name;
-}
-
-    /// <summary>
-    /// Draws a card from the deck and adds it to the player's hand.
-    /// </summary>
-    /// <param name="deck">The deck to draw from.</param>
-    public void Hit(Deck deck)
     {
-        var card = deck.DrawCard();
-        if (card != null)
-            hand.AddCard(card);
+        Id = id;
+        Name = name;
+
+        ResetHand();
     }
 
-    /// <summary>
-    /// Placeholder for stand behavior, e.g., ending turn.
-    /// </summary>
-    public void Stand()
-    {
-        // Logic for standing (end turn) can be implemented here for multiplayer turn management
-    }
-
-    /// <summary>
-    /// Clears the player's hand for a new round.
-    /// </summary>
     public void ResetHand()
     {
-        hand.ResetHand();
+        Hands.Clear();
+
+        var hand = new HandState(new Hand());
+        hand.SetActive(true);
+
+        Hands.Add(hand);
     }
 
-    // Prepared for future multiplayer serialization/extensions
-    // public string ToSerializableFormat() {...}
+    // =========================
+    // SPLIT CHECK
+    // =========================
+    public bool CanSplit()
+    {
+        if (Hands.Count != 1)
+            return false;
+
+        var cards = Hands[0].Cards;
+
+        if (cards.Count != 2)
+            return false;
+
+        return cards[0].Rank == cards[1].Rank;
+    }
+
+    public bool SplitHand()
+    {
+        if (!CanSplit())
+            return false;
+
+        var original = Hands[0];
+
+        Card second = original.Hand.RemoveCardAt(1);
+        Card first = original.Hand.RemoveCardAt(0);
+
+        var hand1 = new HandState(new Hand());
+        var hand2 = new HandState(new Hand());
+
+        hand1.Hand.AddCard(first);
+        hand2.Hand.AddCard(second);
+
+        hand1.SetActive(true);
+
+        Hands.Clear();
+        Hands.Add(hand1);
+        Hands.Add(hand2);
+
+        return true;
+    }
+
+    public void MoveToNextHand()
+    {
+        int index = Hands.FindIndex(h => h.IsActive);
+
+        if (index == -1)
+            return;
+
+        Hands[index].SetActive(false);
+
+        if (index + 1 < Hands.Count)
+            Hands[index + 1].SetActive(true);
+    }
 }

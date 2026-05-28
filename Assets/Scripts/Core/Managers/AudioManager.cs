@@ -10,6 +10,11 @@ public class AudioManager : MonoBehaviour
     [Header("Card Sounds")]
     [SerializeField] private AudioClip cardDealClip;
 
+    [Header("Chip Sounds")]
+    [SerializeField] private AudioClip chipPlacedClip;
+
+    
+
     private void Awake()
     {
         if (Instance == null)
@@ -20,7 +25,13 @@ public class AudioManager : MonoBehaviour
 
     public void PlayCardDeal()
     {
+        Debug.Log("PLAY CARD SOUND");
         if (cardDealClip != null)
             sfxSource.PlayOneShot(cardDealClip);
     }
+
+    public void PlayChipPlace()
+{
+    sfxSource.PlayOneShot(chipPlacedClip);
+}
 }

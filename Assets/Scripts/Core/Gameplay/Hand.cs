@@ -19,6 +19,24 @@ public class Hand
         if (card != null)
             cards.Add(card);
     }
+    public Card RemoveCardAt(int index)
+{
+    if (index < 0 || index >= cards.Count)
+        return null;
+
+    Card card = cards[index];
+    cards.RemoveAt(index);
+
+    return card;
+}
+
+public bool CanSplit()
+{
+    if (cards.Count != 2)
+        return false;
+
+    return cards[0].Rank == cards[1].Rank;
+}
 
     /// <summary>
     /// Calculates the total Blackjack value of the hand, adjusting Aces as needed.
